@@ -26,7 +26,7 @@ class _TodayReviewState extends State<TodayReview> {
         ),
         child: Column(
           children: [
-            SizedBox(height: screenSize.height * 0.05),
+            SizedBox(height: screenSize.height * 0.01),
 
             // 今日の目標
             Stack(
