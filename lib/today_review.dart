@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'bottom_navigation.dart';
+import 'dart:math';
+import 'fukidashi.dart';
 
 class TodayReview extends StatefulWidget {
   @override
@@ -9,6 +11,41 @@ class TodayReview extends StatefulWidget {
 class _TodayReviewState extends State<TodayReview> {
   // 今日の目標が達成されたかどうかを管理するフラグ
   bool _isAchieved = false;
+
+  // コメントリスト
+  List<String> _commentsWhenNotAchieved = [
+    "目標達成に向けて、あと少し！\nあきらめずにがんばろう！",
+    "今日はどうだった？\n諦めないで！",
+    "あなたならきっとできる！\n一歩一歩前進しよう！",
+    "どんな小さな進歩も\n大きな成果に繋がりますよ！",
+    "ひとつずつ進んでいきましょう\n小さな積み重ねが大きな力になりますよ！",
+  ];
+
+  List<String> _commentsWhenAchieved = [
+    "目標達成おめでとうございます！\nこれからも一歩一歩前進していきましょう！",
+    "よくやりましたね！達成できたあなたは本当に素晴らしい。次も頑張りましょう！",
+    "お見事です！\n次も一緒に頑張りましょう！",
+    "お疲れさまでした！\nこれからもどんどん成長していく姿を楽しみにしています！",
+    "素晴らしい！努力が実を結びましたね。\n次もこの調子で進んでいきましょう！",
+  ];
+
+  // ランダムにコメントを選ぶための関数
+  String _getRandomComment(bool isAchieved) {
+    final random = Random();
+    List<String> comments = isAchieved ? _commentsWhenAchieved : _commentsWhenNotAchieved;
+    return comments[random.nextInt(comments.length)];
+  }
+
+  // ランダムに画像を選ぶ関数
+  String _getRandomImage() {
+    final random = Random();
+    // 舞妓さんと神主さんの画像リスト
+    List<String> images = [
+      'image/jinja_miko.png',  // 舞妓さん
+      'image/jinja_kannushi.png',  // 神主さん
+    ];
+    return images[random.nextInt(images.length)];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,8 +104,8 @@ class _TodayReviewState extends State<TodayReview> {
                         ),
                         // 目標編集ボタン
                         Positioned(
-                          bottom: 8,
-                          right: 8, // 右下に配置
+                          bottom: 20,
+                          right: 50, // 右下に配置
                           child: IconButton(
                             icon: Icon(
                               Icons.edit, // 編集アイコン
@@ -150,7 +187,7 @@ class _TodayReviewState extends State<TodayReview> {
             ),
             Spacer(),
 
-            // 舞妓さんコメント
+            // ランダムな舞妓さんまたは神主さん画像を表示
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Row(
@@ -158,44 +195,26 @@ class _TodayReviewState extends State<TodayReview> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 吹き出し部分
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), // 内側に余白を設定
-                    decoration: BoxDecoration(
-                      color: Colors.white, // 吹き出しの背景色
-                      borderRadius: BorderRadius.circular(12), // 角を丸くする
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black45, // 影の色
-                          offset: Offset(0, 3), // 影の位置
-                          blurRadius: 6, // 影のぼかし具合
-                        ),
-                      ],
-                    ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: screenSize.width * 0.5,
-                      ),
-                      child: Text(
-                        '舞妓さんコメント', // コメント内容
-                        style: TextStyle(
-                          fontSize: 16, // フォントサイズ
-                          color: Colors.black, // テキストの色
-                          fontWeight: FontWeight.w600, // フォントの太さ
-                        ),
-                        softWrap: true, // 長いテキストであれば自動で改行
-                        overflow: TextOverflow.visible,
-                      ),
-                    ),
+                  Fukidashi(
+                    text: _getRandomComment(_isAchieved),
+                    maxWidth: screenSize.width * 0.65,  // 吹き出しの横幅を調整
+                    backgroundColor: Colors.white,
+                    textColor: Colors.black,
+                    borderRadius: 12,
+                    arrowSize: 12,
                   ),
                   SizedBox(width: 10),
-                  Image.asset(
-                    'image/jinja_miko.png',
-                    width: screenSize.width * 0.2,
-                    fit: BoxFit.cover, // 画像を枠内に収める
+                  // ランダムな画像を表示
+                  ClipRRect(
+                    child: Image.asset(
+                      _getRandomImage(),
+                      width: screenSize.width * 0.2,  // 画像の幅を調整
+                      fit: BoxFit.cover,  // 画像を枠内に収める
+                    ),
                   ),
                 ],
               ),
-            ),
+            )
           ],
         ),
       ),
