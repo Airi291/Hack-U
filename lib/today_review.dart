@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'bottom_navigation.dart';
 import 'dart:math';
+import 'bottom_navigation.dart';
 import 'fukidashi.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 
 class TodayReview extends StatefulWidget {
   @override
@@ -9,8 +12,100 @@ class TodayReview extends StatefulWidget {
 }
 
 class _TodayReviewState extends State<TodayReview> {
-  // 今日の目標が達成されたかどうかを管理するフラグ
-  bool _isAchieved = false;
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+  FlutterLocalNotificationsPlugin();
+
+  bool _isAchieved = false; // 今日の目標が達成されたか
+  bool _isNotificationOn = false; // 通知がONかどうか
+  TimeOfDay _notificationTime = TimeOfDay(hour: 20, minute: 0); // 通知時刻
+
+  // 仮の今日の目標
+  String todayGoal = '目標1 - 小目標1-1';
+
+  // 仮の小さな目標データ（各大きな目標に対して8つの小さな目標）
+  final List<List<String>> smallGoals = [
+    ['小目標1-1', '小目標1-2', '小目標1-3', '小目標1-4', '小目標1-5', '小目標1-6', '小目標1-7', '小目標1-8'],
+    ['小目標2-1', '小目標2-2', '小目標2-3', '小目標2-4', '小目標2-5', '小目標2-6', '小目標2-7', '小目標2-8'],
+    ['小目標3-1', '小目標3-2', '小目標3-3', '小目標3-4', '小目標3-5', '小目標3-6', '小目標3-7', '小目標3-8'],
+    ['小目標4-1', '小目標4-2', '小目標4-3', '小目標4-4', '小目標4-5', '小目標4-6', '小目標4-7', '小目標4-8'],
+    ['小目標5-1', '小目標5-2', '小目標5-3', '小目標5-4', '小目標5-5', '小目標5-6', '小目標5-7', '小目標5-8'],
+    ['小目標6-1', '小目標6-2', '小目標6-3', '小目標6-4', '小目標6-5', '小目標6-6', '小目標6-7', '小目標6-8'],
+    ['小目標7-1', '小目標7-2', '小目標7-3', '小目標7-4', '小目標7-5', '小目標7-6', '小目標7-7', '小目標7-8'],
+    ['小目標8-1', '小目標8-2', '小目標8-3', '小目標8-4', '小目標8-5', '小目標8-6', '小目標8-7', '小目標8-8'],
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeNotifications();
+    tz_data.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Asia/Tokyo'));
+  }
+
+  // 通知の初期化
+  void _initializeNotifications() {
+    const DarwinInitializationSettings macOSInitializationSettings =
+    DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const InitializationSettings initializationSettings =
+    InitializationSettings(macOS: macOSInitializationSettings);
+
+    flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+    print("通知が初期化されました");
+  }
+
+  // 通知をスケジュール
+  Future<void> _scheduleNotification() async {
+    if (!_isNotificationOn || _isAchieved) {
+      print(
+          "通知はスケジュールされません (_isNotificationOn: $_isNotificationOn, _isAchieved: $_isAchieved)");
+      return;
+    }
+
+    final now = DateTime.now();
+    final selectedDateTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      _notificationTime.hour,
+      _notificationTime.minute,
+    );
+
+    // 現在時刻より前の場合、翌日にスケジュール
+    final notificationTime = selectedDateTime.isBefore(now)
+        ? selectedDateTime.add(Duration(days: 1))
+        : selectedDateTime;
+
+    final tzTime = tz.TZDateTime.from(notificationTime, tz.local);
+
+    const DarwinNotificationDetails macOSNotificationDetails =
+    DarwinNotificationDetails(
+      subtitle: '目標確認の通知',
+      presentAlert: true,
+      presentSound: true,
+    );
+
+    const NotificationDetails notificationDetails =
+    NotificationDetails(macOS: macOSNotificationDetails);
+
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      0, // 通知ID
+      '${todayGoal}', // タイトル
+      _getRandomComment(_isAchieved), // 通知内容
+      tzTime, // 通知時刻
+      notificationDetails,
+      androidAllowWhileIdle: true,
+      uiLocalNotificationDateInterpretation:
+      UILocalNotificationDateInterpretation.absoluteTime,
+    );
+
+    print("通知がスケジュールされました: $tzTime");
+  }
 
   // コメントリスト
   List<String> _commentsWhenNotAchieved = [
@@ -29,33 +124,48 @@ class _TodayReviewState extends State<TodayReview> {
     "素晴らしい！努力が実を結びましたね。\n次もこの調子で進んでいきましょう！",
   ];
 
-  // ランダムにコメントを選ぶための関数
+  // ランダムコメント生成
   String _getRandomComment(bool isAchieved) {
     final random = Random();
-    List<String> comments = isAchieved ? _commentsWhenAchieved : _commentsWhenNotAchieved;
-    return comments[random.nextInt(comments.length)];
+    return (isAchieved ? _commentsWhenAchieved : _commentsWhenNotAchieved)[
+    random.nextInt(isAchieved
+        ? _commentsWhenAchieved.length
+        : _commentsWhenNotAchieved.length)];
   }
 
-  // ランダムに画像を選ぶ関数
+  // ランダム画像を選択
   String _getRandomImage() {
     final random = Random();
-    // 舞妓さんと神主さんの画像リスト
     List<String> images = [
-      'image/jinja_miko.png',  // 舞妓さん
-      'image/jinja_kannushi.png',  // 神主さん
+      'image/jinja_miko.png', // 舞妓さん
+      'image/jinja_kannushi.png', // 神主さん
     ];
     return images[random.nextInt(images.length)];
   }
 
+  // 通知時刻設定ダイアログを表示
+  Future<void> _selectNotificationTime() async {
+    final TimeOfDay? pickedTime = await showTimePicker(
+      context: context,
+      initialTime: _notificationTime,
+    );
+
+    if (pickedTime != null) {
+      setState(() {
+        _notificationTime = pickedTime;
+        print('通知時刻が設定されました: ${_notificationTime.format(context)}');
+        _scheduleNotification(); // 通知を再スケジュール
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 画面のサイズを取得
     final screenSize = MediaQuery.of(context).size;
 
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          // 背景画像を設定
           image: DecorationImage(
             image: AssetImage('image/background.png'),
             fit: BoxFit.cover,
@@ -75,47 +185,24 @@ class _TodayReviewState extends State<TodayReview> {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // 巻物の画像
                         Image.asset(
                           'image/icon_makimono.png',
-                          width: screenSize.width, // 画面幅に合わせる
+                          width: screenSize.width,
                           fit: BoxFit.cover,
                         ),
                         Positioned.fill(
                           child: Align(
-                            alignment: Alignment.center, // テキストを中央に配置
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                double textSize = constraints.maxWidth * 0.08; // テキストサイズを親の幅に応じて変化
-                                return Text(
-                                  '今日の目標',
-                                  style: TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.bold, // 太字に設定
-                                    fontSize: textSize, // サイズは動的に調整する
-                                    height: 1.5, // 行間の調整
-                                  ),
-                                  textAlign: TextAlign.center, // テキストを中央揃え
-                                  softWrap: true, // 長いテキストがあれば自動で改行
-                                );
-                              },
+                            alignment: Alignment.center,
+                            child: Text(
+                              '${todayGoal}',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: screenSize.width * 0.08,
+                                height: 1.5,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                          ),
-                        ),
-                        // 目標編集ボタン
-                        Positioned(
-                          bottom: 20,
-                          right: 50, // 右下に配置
-                          child: IconButton(
-                            icon: Icon(
-                              Icons.edit, // 編集アイコン
-                              color: Color(0xFF79747E), // アイコンの色
-                              size: screenSize.width * 0.08, // アイコンサイズ
-                            ),
-                            onPressed: () {
-                              // 編集ボタンが押された場合
-                              print('目標を編集');
-                            },
                           ),
                         ),
                       ],
@@ -124,39 +211,37 @@ class _TodayReviewState extends State<TodayReview> {
                 ),
               ],
             ),
+
             Spacer(),
 
-            // 目標が達成されたかを管理するボタン
+            // 達成ボタン
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 「達成した！」ボタンになった場合「取り消す」ボタンを表示
                 if (_isAchieved)
                   Padding(
                     padding: EdgeInsets.only(bottom: 10),
                     child: TextButton(
                       onPressed: () {
                         setState(() {
-                          _isAchieved = false; // 達成フラグをリセット
+                          _isAchieved = false;
                         });
                       },
                       style: TextButton.styleFrom(
-                        foregroundColor: Color(0xFF79747E), // ボタンの色
+                        foregroundColor: Color(0xFF79747E),
                         textStyle: TextStyle(
-                          fontSize: screenSize.width * 0.05, // ボタンのフォントサイズ
-                          fontWeight: FontWeight.bold, // 太字に設定
+                          fontSize: screenSize.width * 0.05,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       child: Text('取り消す'),
                     ),
                   ),
-
-                // 達成の状態を切り替える
                 GestureDetector(
                   onTap: () {
                     if (!_isAchieved) {
                       setState(() {
-                        _isAchieved = true; // 目標達成フラグを設定
+                        _isAchieved = true;
                       });
                     }
                   },
@@ -164,61 +249,88 @@ class _TodayReviewState extends State<TodayReview> {
                     width: screenSize.width * 0.6,
                     height: screenSize.width * 0.6,
                     decoration: BoxDecoration(
-                      color: Colors.white, // 背景色を白に設定
-                      shape: BoxShape.circle, // 丸い形に設定
+                      color: Colors.white,
+                      shape: BoxShape.circle,
                       border: Border.all(
-                        color: _isAchieved ? Colors.green : Colors.red, // 達成状態に応じて枠線の色を変える
-                        width: 4, // 枠線の太さ
+                        color: _isAchieved ? Colors.green : Colors.red,
+                        width: 4,
                       ),
                     ),
                     child: Center(
                       child: Text(
-                        _isAchieved ? '達成した！' : '達成した？', // 達成状態に応じてテキストを変更させる
+                        _isAchieved ? '達成した！' : '達成した？',
                         style: TextStyle(
-                          fontSize: screenSize.width * 0.07, // フォントサイズを画面に合わせて設定
-                          fontWeight: FontWeight.bold, // 太字に設定
-                          color: _isAchieved ? Colors.green : Colors.red, // 達成状態に応じた色
+                          fontSize: screenSize.width * 0.07,
+                          fontWeight: FontWeight.bold,
+                          color: _isAchieved ? Colors.green : Colors.red,
                         ),
                       ),
                     ),
                   ),
                 ),
+                SizedBox(height: 20),
+                TextButton(
+                  onPressed: _selectNotificationTime,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.black,
+                  ),
+                  child: Text('通知時刻を設定: ${_notificationTime.format(context)}'),
+                ),
+                SizedBox(height: 10),
+                SwitchListTile(
+                  dense: true,
+                  title: Row(
+                    children: [
+                      Icon(
+                        Icons.notifications,
+                        color: Colors.black,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        '通知をオンにする',
+                        style: TextStyle(color: Colors.black),
+                      ),
+                    ],
+                  ),
+                  value: _isNotificationOn,
+                  onChanged: (value) {
+                    setState(() {
+                      _isNotificationOn = value;
+                      _scheduleNotification();
+                    });
+                  },
+                  activeColor: Colors.green,
+                ),
               ],
             ),
             Spacer(),
-
-            // ランダムな舞妓さんまたは神主さん画像を表示
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center, // 中央揃え
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 吹き出し部分
                   Fukidashi(
                     text: _getRandomComment(_isAchieved),
-                    maxWidth: screenSize.width * 0.65,  // 吹き出しの横幅を調整
+                    maxWidth: screenSize.width * 0.65,
                     backgroundColor: Colors.white,
                     textColor: Colors.black,
                     borderRadius: 12,
                     arrowSize: 12,
                   ),
                   SizedBox(width: 10),
-                  // ランダムな画像を表示
                   ClipRRect(
                     child: Image.asset(
                       _getRandomImage(),
-                      width: screenSize.width * 0.2,  // 画像の幅を調整
-                      fit: BoxFit.cover,  // 画像を枠内に収める
+                      width: screenSize.width * 0.2,
+                      fit: BoxFit.cover,
                     ),
                   ),
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),
-      // ナビゲーション機能
       bottomNavigationBar: BottomNavigation(currentIndex: 0),
     );
   }
